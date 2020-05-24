@@ -59,7 +59,7 @@ def pickframe(corrdata,sample_length):
     #peaks_position=findpeaks(corrdata,sample_length)
     peak_position=findpeak(corrdata)
     #choose the first peak by minus sample_length
-    first_peak=peak_position-(peak_position/sample_length-2)*sample_length
+    first_peak=peak_position-(int(peak_position/sample_length-2))*sample_length
     return first_peak
 
 

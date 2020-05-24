@@ -22,7 +22,7 @@ frequency_higherbound=frequecy_center+channel_bandwidth/2
 """ The sampling rate of the analog to digital convert """
 sampling_rate_send=44100.0
 sampling_rate = 48000.0
-amplitude = 16000
+amplitude = 24000
 
 file = "test.wav"
 nparrayfile="singlesignal.npy"
@@ -34,10 +34,10 @@ sampwidth=2
 
 """ sequnce propertys"""
 sequnce_length=26
-interval_length=38
-P=16
+interval_length=38  #number of interval zeros between sequences
+P=16    #cir related
 L=sequnce_length-P
-circulate_time=4000
+circulate_time=7500 #number of frames in the generated audio
 
 GTS=[0,0,1,0,0,1,0,1,1,1,0,0,0,0,1,0,0,0,1,0,0,1,0,1,1,1]
 
