@@ -1,4 +1,5 @@
 import sys
+import argparse
 import numpy as np
 import math
 import wave
@@ -10,7 +11,8 @@ import scipy.signal as signal
 import scipy.io.wavfile as wavfile
 import scipy.fftpack as fftp
 import matplotlib.pyplot as plt
-from utility import pickframe,slidingwindow,reshape_add,findpeaks,npsignalplot,listsignalplot,fftplot
+from utility import *
+from pcm2wav import pcm2wav
 
 """ params """
 frequecy_center=20000 #18kHz-22kHz
@@ -20,9 +22,9 @@ frequency_lowerbound=frequecy_center-channel_bandwidth/2
 frequency_higherbound=frequecy_center+channel_bandwidth/2
 
 """ The sampling rate of the analog to digital convert """
-sampling_rate_send=44100.0
-sampling_rate = 48000.0
-amplitude = 24000
+sampling_rate_send=48000.0  #sampling rate of the sending signal
+sampling_rate = 48000.0     #sampling rate of the received signal
+amplitude = 24000       #sending signal amplitude parameter
 
 file = "test.wav"
 nparrayfile="singlesignal.npy"
@@ -41,19 +43,11 @@ circulate_time=7500 #number of frames in the generated audio
 
 GTS=[0,0,1,0,0,1,0,1,1,1,0,0,0,0,1,0,0,0,1,0,0,1,0,1,1,1]
 
-sine_wave=[np.sin(2 * np.pi * x/20) for x in range(100)]
+"""program parames"""
+DEBUG_MODE=0
 
-
-def createwave(filename,data):
-    """set wave file params and write data"""
-    wav_file=wave.open(filename, 'w')
-    wav_file.setparams((nchannels, sampwidth, int(sampling_rate), nframes, comptype, compname))
-    for s in data:
-       wav_file.writeframes(struct.pack('h', int(s*amplitude)))
 
 def hammingwindow(data):
-    #length_window=100
-    #length_overlap=length_window/2
     length_window=np.size(data)
     length_overlap=length_window
     #split data with a sliding window
@@ -102,17 +96,14 @@ def upsample(sequence):
     signal_iffted=fftp.ifft(signal_zero_padded)
     signal_iffted_receive=fftp.ifft(signal_zero_padded_receive)
 
-    """add window"""
-    windowed_data=hammingwindow(signal_iffted)
-    npsignalplot(windowed_data)
-    #npsignalplot(signal_iffted)
+
 
     """save correlation sample"""
     np.save(nparrayfile,hammingwindow(signal_iffted_receive))
 
     """change frequency    """
     cosine_wave = np.array([np.cos(2 * np.pi * frequecy_center/sampling_rate_send * x) for x in range(signal_iffted.size)])*math.sqrt(2)
-    signal_inaudible=cosine_wave*windowed_data
+    signal_inaudible=cosine_wave*signal_iffted
 
     #npsignalplot(signal_inaudible)
 
@@ -120,7 +111,11 @@ def upsample(sequence):
     b, a = signal.butter(8, 2*(frequency_lowerbound-1000)/sampling_rate_send, 'highpass')
     filteredData = signal.filtfilt(b, a, signal_inaudible)
 
-    return filteredData
+    """add window"""
+    windowed_data=hammingwindow(filteredData)
+    #npsignalplot(signal_iffted)
+
+    return windowed_data
 
 
 def generate():
@@ -192,12 +187,10 @@ def pearsonCroCor(data,sample):
 """frame detection"""
 def framedetection(data):
     originalarray=np.load(nparrayfile)
-    npsignalplot(originalarray)
     #corr = np.correlate(data,originalarray[:-100], 'valid')
     corr=pearsonCroCor(data[0:20000],originalarray)
     #print(originalarray.size)
     #print(corr.size)
-    npsignalplot(corr)
     return pickframe(corr,originalarray.size)
     #return 0
 
@@ -268,12 +261,7 @@ def estimate(filename):
     dtype correspond to samplewidth, 2byte=short, 32bit float=single
     """
     wave_data = np.frombuffer(str_data, dtype=np.single)
-    npsignalplot(wave_data)
-    #fftplot(fftp.fft(wave_data))
-
-    """denoise"""
-    #filteredData=denoise_HPF(wave_data)
-    #npsignalplot(filteredData)
+    #fftplot(fftp.fft(wave_data) #do fft to see a frequency composition
 
     """remove zero in the front"""
     filteredData=removefrontzero(wave_data)
@@ -282,18 +270,18 @@ def estimate(filename):
     """call downsample function"""
     downsampled_signal=downsample(filteredData)
     #npsignalplot(downsampled_signal)
-    #createwave('test2.wav',filteredData)
     """frame detection"""
     framepos=framedetection(downsampled_signal) #the first frame position
     print("first frame position=",framepos)
 
     """-estimate cir based on frame detection """
-    expanding_length=int(sampling_rate/channel_bandwidth)
+    expanding_length=int(sampling_rate/channel_bandwidth)   #the expanding length for every bit
     frame_length=(sequnce_length+interval_length)*expanding_length  #the whole frame length, including gsm and zeros
     effective_length=int(sequnce_length*expanding_length)  #the gsm part length
     print("frame length=",frame_length)
+
     frame_datas=downsampled_signal
-    """     ready to write to csv file"""
+    #ready to write to csv file
     csvfile=filename[:filename.rfind(".")]+".csv"
     f=open(csvfile,'w',encoding='utf-8',newline='')
     csv_writer=csv.writer(f)
@@ -308,6 +296,9 @@ def estimate(filename):
 
 """estimate files from a filepath or file, altered from pcm2wav"""
 def estimatefiles(path='.'):
+    """先pcm转wav"""
+    pcm2wav(path)
+    """"""
     if path.endswith('.wav'):
         estimate(path)
         return
@@ -324,6 +315,13 @@ def estimatefiles(path='.'):
                 estimate(nextpath)
 
 
+"""generate sending signal with modified parameters"""
+def generate2():
+    print(1+1)
+
+def estimate2(s='./'):
+    print(s)
+
 if __name__ == '__main__':
     #script params
     params=sys.argv
@@ -337,7 +335,7 @@ if __name__ == '__main__':
                 print("Usage:\n",
                 "-h:list the usage\n",
                 "-g,generate:generate gsm-based audio as wav file,default name is ",file,"\n"
-                "-c,cir:distract csi from received audio file or files\n"
+                "-c,cir [filename]:distract csi from received audio file or files\n"
                 )
             elif arg=='-g' or arg=='generate':
                 print("generating")
@@ -352,5 +350,5 @@ if __name__ == '__main__':
     else:
         """manual debug"""
         #generate()
-        estimate("6_441.wav")
+        #estimate("1_honor.wav")
         #estimatefiles("2020-05-05-14-03-02")

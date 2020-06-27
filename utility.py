@@ -90,6 +90,13 @@ def fftplot(fft_y):
     plt.title('双边相位谱（未归一化）')
     plt.show()
 
+#根据需要的音频时长（秒）和单帧时长（长度和采样率计算）计算帧的数量
+def framenumber(time,framelength,samplerate):
+    frametime=framelength/samplerate
+    return int(time/frametime)
+
+
+
 if __name__ == '__main__':
     A=[1,2,3,4,5,6,7,8,9,10,11]
     #B=slidingwindow(A,9,1)
