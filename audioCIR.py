@@ -15,7 +15,11 @@ import matplotlib.pyplot as plt
 from utility import *
 from pcm2wav import pcm2wav
 
-""" params """
+
+"""program control flags """
+
+
+"""audio params """
 frequecy_center=20000 #18kHz-22kHz
 num_samples = 48000
 channel_bandwidth=4000
@@ -39,13 +43,29 @@ sampwidth=2
 """ sequnce propertys"""
 sequnce_length=26
 interval_length=38  #number of interval zeros between sequences
-P=16    #cir related
+P=16    #cir P, P must be bigger than L
 L=sequnce_length-P
 circulate_time=1000 #number of frames in the generated audio
 
 GTS=[0,0,1,0,0,1,0,1,1,1,0,0,0,0,1,0,0,0,1,0,0,1,0,1,1,1]
 
 GTS_2=[0,0,1,0,1,1,0,1,1,1,0,1,1,1,1,0,0,0,1,0,1,1,0,1,1,1]
+
+GTS_3=[0,1,0,0,0,0,1,1,1,0,1,1,1,0,1,0,0,1,0,0,0,0,1,1,1,0]
+
+GTS_4=[0,1,0,0,0,1,1,1,1,0,1,1,0,1,0,0,0,1,0,0,0,1,1,1,1,0]
+
+GTS_5=[0,0,0,1,1,0,1,0,1,1,1,0,0,1,0,0,0,0,0,1,1,0,1,0,1,1]
+
+GTS_6=[0,1,0,0,1,1,1,0,1,0,1,1,0,0,0,0,0,1,0,0,1,1,1,0,1,0]
+
+GTS_7=[1,0,1,0,0,1,1,1,1,1,0,1,1,0,0,0,1,0,1,0,0,1,1,1,1,1]
+
+GTS_8=[1,1,1,0,1,1,1,1,0,0,0,1,0,0,1,0,1,1,1,0,1,1,1,1,0,0]
+
+Barker=[-1,-1,-1,-1,-1,1,1,-1,-1,1,-1,1,-1]
+
+Barker_11=[1,1,1,0,0,0,1,0,0,1,0]
 
 """program parames"""
 DEBUG_MODE=0
@@ -81,22 +101,21 @@ def upsample(sequence):
 
     #fftplot(fft_sequence)
 
-    """zero-padding"""
+    """zero-padding
+        产生两份样本，一份是发送的采样率，一份是接收的采样率
+    """
+    signal_unpadded=fft_sequence
+
     upsample_length=sampling_rate_send/channel_bandwidth
     upsample_length_receive=sampling_rate/channel_bandwidth
 
-    signal_unpadded=fft_sequence
-
-
-    #add zero in middle of signal
+    #add zero in middle of signal插零要在fft得到信号中间
     insert_position=int(signal_unpadded.size/2)
-    zero_number=upsample_length*signal_unpadded.size-signal_unpadded.size
+    zero_number=int(upsample_length*signal_unpadded.size-signal_unpadded.size)
     signal_zero_padded=np.insert(signal_unpadded,insert_position,np.zeros(zero_number))
 
     zero_number_receive=int((upsample_length_receive-1)*signal_unpadded.size)
     signal_zero_padded_receive=np.insert(signal_unpadded,insert_position,np.zeros(zero_number_receive))
-
-    #fftplot(signal_zero_padded)
 
     """ifft"""
     signal_iffted=fftp.ifft(signal_zero_padded)
@@ -110,6 +129,8 @@ def upsample(sequence):
     #np.save(nparrayfile,signal_iffted_receive)
 
     np.save(nparrayfile,signal_iffted_receive)
+    selfCorr(signal_iffted_receive)
+
 
     """change frequency    """
     cosine_wave = np.array([np.cos(2 * np.pi * frequecy_center/sampling_rate_send * x) for x in range(signal_iffted.size)])*math.sqrt(2)
@@ -129,7 +150,7 @@ def upsample(sequence):
     #   np.save(nparrayfile,signal_inaudible_receive)
 
     """highpass filtering"""
-    b, a = signal.butter(8, 2*(frequency_lowerbound-1000)/sampling_rate_send, 'highpass')
+    b, a = signal.butter(8, 2*(frequency_lowerbound-100)/sampling_rate_send, 'highpass')
     filteredData = signal.filtfilt(b, a, signal_inaudible)
 
 
@@ -138,7 +159,7 @@ def upsample(sequence):
     #npsignalplot(signal_iffted)
 
     #np.save(nparrayfile,windowed_data)
-    return signal_iffted
+    return windowed_data
 
 
 def generate():
@@ -148,23 +169,24 @@ def generate():
     signal_inaudible=upsample(GTS)
     """circulate GSM sequnce, change one byte at a time"""
     for i in range(circulate_time):
-        #listsignalplot(GTS)
         final_data=np.append(final_data,signal_inaudible)
 
     #npsignalplot(final_data)
 
-    #framedetection(final_data)
+    """set wave file params and write data
+        wav lib does not support float number, so use scipy.io.wavfile is better
+    """
 
-    """set wave file params and write data"""
-
+    """#DEPRECATED
     wav_file=wave.open(genfile, 'w')
     wav_file.setparams((nchannels, sampwidth, int(sampling_rate_send), int(sampling_rate_send), comptype, compname))
     #print("highest Amp =",max(final_data))
     for s in final_data:
        wav_file.writeframes(struct.pack('h', int(s*amplitude)))
+    """
 
-    #final_data=np.float32(final_data)
-    #wavfile.write('testwavfile.wav',int(sampling_rate_send),final_data)
+    final_data=np.float32(final_data) #wavfile support float64,but most smartphone only support float32
+    wavfile.write(genfile,int(sampling_rate_send),final_data)
 
     return 1
 
@@ -195,6 +217,7 @@ def removefrontzero(data):
     i=0
     continuouscount=0;
     threshold=0.0001;
+    #小于一定阈值的都视为无效数据，连续数位超过阈值就进入正常数据部分了
     while i<data.size and continuouscount<1:
         if abs(data[i])<threshold and abs(data[i])>-threshold:
             continuouscount=0
@@ -202,44 +225,31 @@ def removefrontzero(data):
             continuouscount+=1
         i+=1
 
+    #打印0的数量
     print("zero length:",i)
     return data[i:]
 
-"""pearson cross correlation"""
-def pearsonCroCor(data,sample):
-    corresult=np.zeros(data.size-sample.size+1)
-    #slide the data, every time pick sample.size elements to do pearson with sample
-    i=0
-    while i+sample.size<=data.size:
-        #corresult[i]=pearsonr(data[i:i+sample.size],sample)[0]
-        corresult[i]=np.corrcoef(data[i:i+sample.size],sample)[0][1]
-        i+=1
-    return corresult
 
 """frame detection"""
-def framedetection(data):
+def framedetection(data,framelength):
     originalarray=np.real(np.load(nparrayfile))
     realdata=np.real(data)
     #corr = np.correlate(data,originalarray[:-100], 'valid')
-    corr=pearsonCroCor(realdata[0:20000],originalarray)
+    corr=pearsonCroCor(realdata[0:framelength*5],originalarray)
     #print(originalarray.size)
     #print(corr.size)
-    npsignalplot(realdata[0:3000])
-    npsignalplot(originalarray)
+    npsignalplot(realdata[0:framelength*5])
     npsignalplot(corr)
     return pickframe(corr,originalarray.size)
     #return 0
 
 """Least square way to estimate CIR"""
 """ original GTS related"""
-array_CTS=np.empty(shape=(P,L))
-M_CTS_final=np.empty(shape=(L,P))
+array_CTS=np.empty(shape=(1,1))
+M_CTS_final=np.empty(shape=(1,1))
 matrix_CTS_inited=0
 
-""" expanding sequence related"""
-array_CTS_expanding=np.empty(shape=(1,1))
-M_CTS_expanding_final=np.empty(shape=(1,1))
-matrix_CTS_expanding_inited=0;
+
 
 """
     CIR matrix calculation, the return matrix M size is L*P, and CIR=M*y
@@ -247,16 +257,22 @@ matrix_CTS_expanding_inited=0;
 """
 def CIR_Matrix(L_L,P_L,Seq):
     global matrix_CTS_inited
+    global array_CTS
 
-    if matrix_CTS_inited==0:
+    if matrix_CTS_inited==0 or array_CTS.shape[0]!=P_L:
         """create circulant training sequence matrix"""
+        array_CTS=np.empty(shape=(P_L,L_L+1))
         for i in range(P_L):
-            line=Seq[i:i+L_L]
+            line=Seq[i:i+L_L+1]
             line.reverse()
             array_CTS[i]=np.asarray(line)
         M_CTS=np.matrix(array_CTS)
         """calculate M"""
+        print(M_CTS)
+        print(((M_CTS.H) * M_CTS ))
         M_CTS_final=((M_CTS.H*M_CTS).I)*M_CTS.H
+        print(M_CTS_final)
+        print(1/P_L * M_CTS.H)
         matrix_CTS_inited=1
     """do matrix translation"""
     #result_CIR=M_CTS_final*np.matrix(data[L_L:L_L+P_L]).T
@@ -264,41 +280,95 @@ def CIR_Matrix(L_L,P_L,Seq):
     return M_CTS_final
 
 
+
+""" expanding sequence related"""
+circulant_TSM_expanding_inited=0
+circulant_TSM_expanding=np.empty(shape=(1,1))
+M_CTS_expanding_final=np.empty(shape=(1,1))
+matrix_CTS_expanding_inited=0;
+
+sequence_Tr=np.zeros(1)
+sequence_Tr_inited=0
+
 """
     CIR estimation from expanded GSM
 """
+
+"""the matrix 'M' """
+def Circulant_TSM(L_L,P_L,expanding_length):
+    global circulant_TSM_expanding_inited
+    global circulant_TSM_expanding
+    L=L_L*expanding_length
+    P=P_L*expanding_length
+    if circulant_TSM_expanding_inited==0 or (circulant_TSM_expanding.shape[0]!=P or circulant_TSM_expanding.shape[1]!=L+1):
+        circulant_TSM_expanding=np.empty(shape=(P,L+1),dtype=complex)
+        #存的如果是ifft回来的结果为复数
+        Sequence=(np.load(nparrayfile))
+        for i in range(P):
+            line=Sequence[i:i+L+1]
+            line=np.flip(line,0)
+            circulant_TSM_expanding[i]=line
+    return circulant_TSM_expanding
+
+
+
+"""(M^H M)^-1 M^H"""
 def CIR_Matrix_Expanding(L_L,P_L,expanding_length):
     global matrix_CTS_expanding_inited
-    global array_CTS_expanding
     global M_CTS_expanding_final
 
     L=L_L*expanding_length
     P=P_L*expanding_length
-    if matrix_CTS_expanding_inited==0 or (array_CTS_expanding.shape[0]!=P or array_CTS_expanding.shape[1]!=L):
-        array_CTS_expanding=np.empty(shape=(P,L))
-        M_CTS_expanding_final=np.empty(shape=(L,P))
-        #存的如果是ifft回来的结果会带一个虚部，虚部并没有参与发送，所以保留实部
-        Sequence=np.real(np.load(nparrayfile))
-        for i in range(P):
-            line=Sequence[i:i+L]
-            line=np.flip(line,0)
-            array_CTS_expanding[i]=line
-        M_CTS=np.matrix(array_CTS_expanding)
+    if matrix_CTS_expanding_inited==0 or (M_CTS_expanding_final.shape[0]!=L+1 or M_CTS_expanding_final.shape[1]!=P):
+        M_CTS=np.matrix(Circulant_TSM(L_L,P_L,expanding_length))
         M_CTS_expanding_final=((M_CTS.H*M_CTS).I)*M_CTS.H
+        #print((M_CTS.H*M_CTS)[0])
         matrix_CTS_expanding_inited=1
     return M_CTS_expanding_final
 
+def CIR_Matrix_Expanding_approximation(L_L,P_L,expanding_length):
+    global matrix_CTS_expanding_inited
+    global M_CTS_expanding_final
+
+    M_CTS=np.matrix(Circulant_TSM(L_L,P_L,expanding_length))
+    L=L_L*expanding_length
+    P=P_L*expanding_length
+    if matrix_CTS_expanding_inited==0 or (M_CTS_expanding_final.shape[0]!=L+1 or M_CTS_expanding_final.shape[1]!=P):
+        M_CTS_expanding_final=M_CTS.H
+        matrix_CTS_expanding_inited=1
+    return M_CTS_expanding_final
+
+"""cross-correlation sample for cir estimation"""
+def CIR_Sample_CC(L_L,P_L,expanding_length):
+    global sequence_Tr
+    global sequence_Tr_inited
+    L=L_L*expanding_length
+    P=P_L*expanding_length
+    if sequence_Tr_inited==0 or sequence_Tr.size!=(L+P):
+        Sequence=(np.load(nparrayfile))
+        sequence_Tr=Sequence[:L+P]
+        sequence_Tr_inited=1
+    return sequence_Tr
+
+
 """use original 26bit GTS to generate CIR"""
-def CIR_SIMPLE(data):
+def CIR_LS_SIMPLE(data):
     M_CTS=CIR_Matrix(L,P,GTS)
     result_CIR=M_CTS*np.matrix(data[L:L+P]).T
     return result_CIR
 
 """use expanded GTS to generate longer CIR"""
-def CIR_Expanding(data,expanding_length):
-    M_translation=CIR_Matrix_Expanding(L,P,expanding_length)
+def CIR_LS_Expanding(data,expanding_length):
+    M_translation=CIR_Matrix_Expanding_approximation(L,P,expanding_length)
     result_CIR=M_translation*((np.matrix(data[L*expanding_length:(L+P)*expanding_length])).T)
-    return result_CIR
+    return result_CIR.flatten()[0].tolist()
+
+"""cross-correlation way of CIR estimation """
+def CIR_CC_Expanding(data,expanding_length):
+    sample_send=CIR_Sample_CC(L,P,expanding_length)
+    result_CIR=np.correlate(data[:(L+P)*expanding_length],sample_send,'same')
+    return result_CIR.tolist()
+
 
 """extract sequence from frame"""
 def received_sequence(data):
@@ -319,25 +389,25 @@ def estimate(filename):
     """read the wave file raw data
     wave lib cannot support 32bit float, but 32bit float samplewidth could be read by np.frombuffer() parameter dtype
     """
-    """
+
     wav_file=wave.open(filename,'rb')
     params = wav_file.getparams()
     nchannels, sampwidth, framerate, nframes = params[:4]
     str_data = wav_file.readframes(nframes)
     wav_file.close()
-    """
+
     """convert raw data
     dtype correspond to samplewidth, 2byte=short, 32bit float=single
     """
-    #wave_data = np.frombuffer(str_data, dtype=np.single)
+    wave_data = np.frombuffer(str_data, dtype=np.single)
 
-    samplerate, wave_data = wavfile.read(filename)
+    #samplerate, wave_data = wavfile.read(filename) #
 
 
     npsignalplot(wave_data)
 
 
-    """remove zero in the front"""
+    """pre-processing remove zero in the front"""
     filteredData=denoise_HPF(removefrontzero(wave_data))
     #npsignalplot(filteredData)
 
@@ -347,16 +417,22 @@ def estimate(filename):
     #npsignalplot(downsampled_signal)
     """frame detection"""
 
-    npsignalplot(downsampled_signal)
+    expanding_length=int(sampling_rate/channel_bandwidth)   #the expanding length for every bit
+    effective_length=int(sequnce_length*expanding_length)  #the gsm part length
 
-    framepos=framedetection(downsampled_signal) #the first frame position
+    frame_length=(sequnce_length+interval_length)*expanding_length  #the whole frame length, including gsm and zeros
+
+    print("frame length=",frame_length)
+
+
+    downsampled_signal=downsampled_signal[frame_length*10:]#remove the front frames in case of hardware jaming
+
+
+    framepos=framedetection(downsampled_signal,frame_length) #the first frame position
     print("first frame position=",framepos)
 
     """-estimate cir based on frame detection """
-    expanding_length=int(sampling_rate/channel_bandwidth)   #the expanding length for every bit
-    frame_length=(sequnce_length+interval_length)*expanding_length  #the whole frame length, including gsm and zeros
-    effective_length=int(sequnce_length*expanding_length)  #the gsm part length
-    print("frame length=",frame_length)
+
 
     frame_datas=downsampled_signal
     #ready to write to csv file
@@ -366,13 +442,27 @@ def estimate(filename):
 
     """     iterate to calculate each frame cir"""
     i=int(framepos)
+    framecount=0
+
+    practical_frame_length=int((sequnce_length+interval_length)*(sampling_rate_send/channel_bandwidth)) /sampling_rate_send * sampling_rate  #the real frame length may not be precise because of 44.1k to 48k
+
     while i+frame_length<=np.size(frame_datas):
-        framesequence=frame_datas[i:i+effective_length]
+        framesequence=frame_datas[int(i):int(i)+effective_length]
         """CIR estimation for each frame"""
-        cir=CIR_Expanding(framesequence,expanding_length)
-        csv_writer.writerows(cir.flatten()[0].tolist())
+        cir=CIR_LS_Expanding(framesequence,expanding_length)
+        csv_writer.writerow(cir)
+
+        framecount+=1
+
+        if framecount>=100:
+            framepos=framedetection(frame_datas[i:],frame_length)
+            if (framepos>=frame_length/2):
+                i-=frame_length
+            i+=framepos
+            print("aligned position:",framepos)
+            framecount=0
+
         i+=frame_length
-    print(M_CTS_expanding_final)
 
 """estimate files from a filepath or file, altered from pcm2wav"""
 def estimatefiles(path='.'):
@@ -433,6 +523,19 @@ if __name__ == '__main__':
                     print("-c or cir need a param of file or directory name")
     else:
         """manual debug"""
+        sequence_data=GTS
+        for i in range(len(sequence_data)):
+            if (sequence_data[i]==0):
+                sequence_data[i]=-1
+        print(sequence_data)
+        matrix=CIR_Matrix(5,8,sequence_data)
+        #matrix=(1/(P*12))*np.matrix(Circulant_TSM(L,P,12)).H
+        matrix=CIR_Matrix_Expanding_approximation(L,P,12)
+        matrix2=np.zeros(matrix.shape[0])
+        for i in range(matrix.shape[0]):
+            matrix2[i]=np.sum(matrix[i])
+        print(sum(matrix2))
+        npsignalplot(matrix2)
 
         #generate()
         #estimate("1_honor.wav")

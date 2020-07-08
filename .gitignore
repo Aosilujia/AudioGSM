@@ -3,3 +3,8 @@ __pycache__
 *.wav
 *.csv
 *.pk
+*.txt
+*.zip
+2020*
+gsmtest
+test*

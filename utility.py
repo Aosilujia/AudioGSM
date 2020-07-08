@@ -1,7 +1,24 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
-#
+
+
+"""pearson cross correlation"""
+def pearsonCroCor(data,sample):
+    corresult=np.zeros(data.size-sample.size+1)
+    #slide the data, every time pick sample.size elements to do pearson with sample
+    i=0
+    while i+sample.size<=data.size:
+        #corresult[i]=pearsonr(data[i:i+sample.size],sample)[0]
+        corresult[i]=np.corrcoef(data[i:i+sample.size],sample)[0][1]
+        i+=1
+    return corresult
+
+"""test the self-correlation properties of one data """
+def selfCorr(data):
+    npsignalplot(pearsonCroCor(np.append(np.append(data,data),data),data))
+
+""" sliding window"""
 def slidingwindow(X = np.array([]), n = 1, p = 0):
     #buffers data vector X into length n column vectors with overlap p
     #excess data at the end of X is discarded
@@ -14,7 +31,7 @@ def slidingwindow(X = np.array([]), n = 1, p = 0):
         data[row] = X[startIndex:startIndex + n] #fill in by column
     return data
 
-#combine the buffered array together, only need overlap p as param, length could be obtained from X
+"""combine the buffered array together, only need overlap p as param, length could be obtained from X"""
 def reshape_add(X = np.array([]),p=0):
     n = X.shape[1]
     p = int(p)
@@ -28,7 +45,7 @@ def reshape_add(X = np.array([]),p=0):
         data[i*p:i*p+n]+=X[i]
     return data
 
-#find cross-correlation peaks
+"""not finished: find cross-correlation peaks"""
 def findpeaks(data,sample_length):
     corrdata=np.abs(data)
     npsignalplot(corrdata)
@@ -47,19 +64,20 @@ def findpeaks(data,sample_length):
     print(np.size(peaks_position))
     return peaks_position
 
+"""find the peak"""
 def findpeak(data):
-    return np.argmax(data)
+    return np.argmax(np.abs(data))
 
-#return cross-correlation peak number
-def peakcount(corrdata,sample_length):
-    return np.size(findpeaks(corrdata,sample_length))
+"""return cross-correlation peak number"""
+def peakcount(corrdata,frame_length):
+    return np.size(findpeaks(corrdata,frame_length))
 
-#pick a peak as frame start
-def pickframe(corrdata,sample_length):
+"""calculate an early peak based on the result"""
+def pickframe(corrdata,frame_length):
     #peaks_position=findpeaks(corrdata,sample_length)
     peak_position=findpeak(corrdata)
-    #choose the first peak by minus sample_length
-    first_peak=peak_position-(int(peak_position/sample_length-2))*sample_length
+    #choose the first peak by minus length of frames
+    first_peak=peak_position-int(peak_position/frame_length)*frame_length
     return first_peak
 
 
