@@ -1,6 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
-
+from scipy.stats.stats import pearsonr
 
 
 """pearson cross correlation"""
@@ -8,9 +8,10 @@ def pearsonCroCor(data,sample):
     corresult=np.zeros(data.size-sample.size+1)
     #slide the data, every time pick sample.size elements to do pearson with sample
     i=0
-    while i+sample.size<=data.size:
-        #corresult[i]=pearsonr(data[i:i+sample.size],sample)[0]
-        corresult[i]=np.corrcoef(data[i:i+sample.size],sample)[0][1]
+    sample_size=sample.size
+    while i+sample_size<=data.size:
+        #corresult[i]=pearsonr(data[i:i+sample_size],sample)[0]
+        corresult[i]=np.corrcoef(data[i:i+sample_size],sample)[0][1]
         i+=1
     return corresult
 
@@ -45,24 +46,23 @@ def reshape_add(X = np.array([]),p=0):
         data[i*p:i*p+n]+=X[i]
     return data
 
-"""not finished: find cross-correlation peaks"""
-def findpeaks(data,sample_length):
-    corrdata=np.abs(data)
+"""find all correlation peaks"""
+def findpeaks(corrdata,sample_length):
+    peak_positions=np.zeros(int(corrdata.size/sample_length))
     npsignalplot(corrdata)
-    avg=np.mean(corrdata)
-    std=np.std(corrdata)
-    """calculate expected frame number, by changing threshold improve to the expected number"""
-    ideal_frame_number=2*int(data.size/sample_length)
-    detection_number=data.size #maximum
-    threshold=avg+std
-    while detection_number>=ideal_frame_number:
-        peaks_position=np.where(corrdata>threshold)
-        detection_number=np.size(np.where(np.diff(peaks_position)>20))
-        threshold+=std
-    print("picking correlation result upper than",threshold)
-    print((peaks_position))
-    print(np.size(peaks_position))
-    return peaks_position
+    i=0
+    peak_count=0
+    """note: divide by 2 is corresponding to the length of gsm and zeros added
+    """
+    while i+sample_length/2<=corrdata.size:
+        if int(i+sample_length)>=corrdata.size:
+            i=int(i)+np.argmax(np.abs(corrdata[int(i):]))
+        else:
+            i=int(i)+np.argmax(np.abs(corrdata[int(i):int(i+sample_length)]))
+        peak_positions[peak_count]=int(i)
+        i+=sample_length/2
+        peak_count+=1
+    return peak_positions
 
 """find the peak"""
 def findpeak(data):
@@ -74,10 +74,11 @@ def peakcount(corrdata,frame_length):
 
 """calculate an early peak based on the result"""
 def pickframe(corrdata,frame_length):
-    #peaks_position=findpeaks(corrdata,sample_length)
     peak_position=findpeak(corrdata)
-    #choose the first peak by minus length of frames
-    first_peak=peak_position-int(peak_position/frame_length)*frame_length
+    """choose the first peak by minus length of frames
+        the first int() is for the integer part of dividing, the second int() is used in case that frame_length is not integer
+    """
+    first_peak=peak_position-int(int(peak_position/frame_length)*frame_length)
     return first_peak
 
 

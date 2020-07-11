@@ -18,6 +18,17 @@ from pcm2wav import pcm2wav
 
 """program control flags """
 
+PRECISE_FRAME_DETECTION_MODE=0 #don't set precise mode to 1, it is shit
+
+""" The sampling rate of the analog to digital convert """
+sampling_rate_send=44100.0  #sampling rate of the sending signal
+sampling_rate = 48000.0     #sampling rate of the received signal
+amplitude=4                 #amplitude parameter, changes the amplitude
+amplitude_wav = 24000       #sending signal amplitude parameter, only for wav lib
+
+genfile = "test.wav"
+
+nparrayfile="sample4receive.npy"
 
 """audio params """
 frequecy_center=20000 #18kHz-22kHz
@@ -26,14 +37,6 @@ channel_bandwidth=4000
 frequency_lowerbound=frequecy_center-channel_bandwidth/2
 frequency_higherbound=frequecy_center+channel_bandwidth/2
 
-""" The sampling rate of the analog to digital convert """
-sampling_rate_send=48000.0  #sampling rate of the sending signal
-sampling_rate = 48000.0     #sampling rate of the received signal
-amplitude = 24000       #sending signal amplitude parameter
-
-genfile = "test.wav"
-
-nparrayfile="sample4receive.npy"
 nframes=num_samples
 comptype="NONE"
 compname="not compressed"
@@ -45,8 +48,9 @@ sequnce_length=26
 interval_length=38  #number of interval zeros between sequences
 P=16    #cir P, P must be bigger than L
 L=sequnce_length-P
-circulate_time=1000 #number of frames in the generated audio
+circulate_time=7500 #number of frames in the generated audio
 
+"""sequences """
 GTS=[0,0,1,0,0,1,0,1,1,1,0,0,0,0,1,0,0,0,1,0,0,1,0,1,1,1]
 
 GTS_2=[0,0,1,0,1,1,0,1,1,1,0,1,1,1,1,0,0,0,1,0,1,1,0,1,1,1]
@@ -142,9 +146,9 @@ def upsample(sequence):
     cosine_wave_receive = np.array([np.cos(2 * np.pi * frequecy_center/sampling_rate * x) for x in range(signal_iffted_receive.size)])*math.sqrt(2)
     signal_inaudible_receive=cosine_wave_receive*signal_iffted_receive
 
-    signal_inaudible*=2
+    signal_inaudible*=amplitude
 
-    signal_inaudible_receive*=2
+    signal_inaudible_receive*=amplitude
 
 
     #   np.save(nparrayfile,signal_inaudible_receive)
@@ -182,7 +186,7 @@ def generate():
     wav_file.setparams((nchannels, sampwidth, int(sampling_rate_send), int(sampling_rate_send), comptype, compname))
     #print("highest Amp =",max(final_data))
     for s in final_data:
-       wav_file.writeframes(struct.pack('h', int(s*amplitude)))
+       wav_file.writeframes(struct.pack('h', int(s*amplitude_wav)))
     """
 
     final_data=np.float32(final_data) #wavfile support float64,but most smartphone only support float32
@@ -229,19 +233,43 @@ def removefrontzero(data):
     print("zero length:",i)
     return data[i:]
 
+"""the transmitted sequence, maybe used in many cases"""
+sequence_Tr=np.zeros(1)
+sequence_Tr_inited=0
 
-"""frame detection"""
+"""an encapsulated function to get the transmitted sequence"""
+def sequenceTr():
+    global sequence_Tr
+    global sequence_Tr_inited
+    if sequence_Tr_inited==0:
+        Sequence=(np.load(nparrayfile))
+        sequence_Tr=Sequence[:L+P]
+        sequence_Tr_inited=1
+    return sequence_Tr
+
+"""frame detection, returns the first frame position"""
 def framedetection(data,framelength):
-    originalarray=np.real(np.load(nparrayfile))
-    realdata=np.real(data)
+    original_array=np.real(np.load(nparrayfile))
+    real_data=np.real(data)
     #corr = np.correlate(data,originalarray[:-100], 'valid')
-    corr=pearsonCroCor(realdata[0:framelength*5],originalarray)
-    #print(originalarray.size)
-    #print(corr.size)
-    npsignalplot(realdata[0:framelength*5])
-    npsignalplot(corr)
-    return pickframe(corr,originalarray.size)
-    #return 0
+    detect_length=int(framelength*5)
+    if (data.size<detect_length):
+        detect_length=data.size
+    corr=pearsonCroCor(real_data[0:detect_length],original_array)
+    #npsignalplot(corr)
+
+    return pickframe(corr,framelength)
+
+
+""" frame detection precise, returns position array of every frame"""
+def framedetection_precise(data,framelength):
+    original_array=np.real(np.load(nparrayfile))
+    real_data=np.real(data)
+    #corr = np.correlate(data,originalarray[:-100], 'valid')
+    corr=pearsonCroCor(real_data,original_array)
+    #npsignalplot(corr)
+    return findpeaks(corr,framelength)
+
 
 """Least square way to estimate CIR"""
 """ original GTS related"""
@@ -287,8 +315,7 @@ circulant_TSM_expanding=np.empty(shape=(1,1))
 M_CTS_expanding_final=np.empty(shape=(1,1))
 matrix_CTS_expanding_inited=0;
 
-sequence_Tr=np.zeros(1)
-sequence_Tr_inited=0
+
 
 """
     CIR estimation from expanded GSM
@@ -340,15 +367,7 @@ def CIR_Matrix_Expanding_approximation(L_L,P_L,expanding_length):
 
 """cross-correlation sample for cir estimation"""
 def CIR_Sample_CC(L_L,P_L,expanding_length):
-    global sequence_Tr
-    global sequence_Tr_inited
-    L=L_L*expanding_length
-    P=P_L*expanding_length
-    if sequence_Tr_inited==0 or sequence_Tr.size!=(L+P):
-        Sequence=(np.load(nparrayfile))
-        sequence_Tr=Sequence[:L+P]
-        sequence_Tr_inited=1
-    return sequence_Tr
+    return sequenceTr()
 
 
 """use original 26bit GTS to generate CIR"""
@@ -404,16 +423,16 @@ def estimate(filename):
     #samplerate, wave_data = wavfile.read(filename) #
 
 
-    npsignalplot(wave_data)
+    #npsignalplot(wave_data)
 
 
     """pre-processing remove zero in the front"""
-    filteredData=denoise_HPF(removefrontzero(wave_data))
+    filtered_Data=denoise_HPF(removefrontzero(wave_data))
     #npsignalplot(filteredData)
 
 
     """call downsample function"""
-    downsampled_signal=downsample(filteredData)
+    downsampled_signal=downsample(filtered_Data)
     #npsignalplot(downsampled_signal)
     """frame detection"""
 
@@ -421,14 +440,16 @@ def estimate(filename):
     effective_length=int(sequnce_length*expanding_length)  #the gsm part length
 
     frame_length=(sequnce_length+interval_length)*expanding_length  #the whole frame length, including gsm and zeros
+    practical_frame_length=int((sequnce_length+interval_length)*(sampling_rate_send/channel_bandwidth)) /sampling_rate_send * sampling_rate  #the real frame length may not be precise because of 44.1k to 48k
 
     print("frame length=",frame_length)
+    print("practical frame length=",practical_frame_length)
 
 
     downsampled_signal=downsampled_signal[frame_length*10:]#remove the front frames in case of hardware jaming
 
 
-    framepos=framedetection(downsampled_signal,frame_length) #the first frame position
+    framepos=framedetection(downsampled_signal,practical_frame_length) #the first frame position
     print("first frame position=",framepos)
 
     """-estimate cir based on frame detection """
@@ -441,28 +462,42 @@ def estimate(filename):
     csv_writer=csv.writer(f)
 
     """     iterate to calculate each frame cir"""
-    i=int(framepos)
+
     framecount=0
 
-    practical_frame_length=int((sequnce_length+interval_length)*(sampling_rate_send/channel_bandwidth)) /sampling_rate_send * sampling_rate  #the real frame length may not be precise because of 44.1k to 48k
 
-    while i+frame_length<=np.size(frame_datas):
-        framesequence=frame_datas[int(i):int(i)+effective_length]
-        """CIR estimation for each frame"""
-        cir=CIR_LS_Expanding(framesequence,expanding_length)
-        csv_writer.writerow(cir)
+    if PRECISE_FRAME_DETECTION_MODE==1:
+        peaks=framedetection_precise(frame_datas,practical_frame_length)
+        print ("peak count:",peaks.size)
+        print(peaks)
+        for peak in peaks:
+            framesequence=frame_datas[int(peak):int(peak)+effective_length]
+            """CIR estimation for each frame"""
+            npsignalplot(framesequence)
+            cir=CIR_LS_Expanding(framesequence,expanding_length)
+            csv_writer.writerows(cir)
 
-        framecount+=1
+    elif PRECISE_FRAME_DETECTION_MODE==0:
+        i=int(framepos)
+        while i+frame_length<=np.size(frame_datas):
+            framesequence=frame_datas[int(i):int(i)+effective_length]
+            """CIR estimation for each frame"""
+            cir=CIR_LS_Expanding(framesequence,expanding_length)
 
-        if framecount>=100:
-            framepos=framedetection(frame_datas[i:],frame_length)
-            if (framepos>=frame_length/2):
-                i-=frame_length
-            i+=framepos
-            print("aligned position:",framepos)
-            framecount=0
+            csv_writer.writerows(cir)
+            """relocate frame process"""
+            """
+            framecount+=1
+            if framecount>=10:
+                framepos=framedetection(frame_datas[int(i):],practical_frame_length)
+                if (framepos>=frame_length/2):
+                    i-=practical_frame_length
+                i+=framepos
+                print("aligned position:",framepos)
+                framecount=0
+            """
+            i+=practical_frame_length  #choose practical frame length to avoid mistakes
 
-        i+=frame_length
 
 """estimate files from a filepath or file, altered from pcm2wav"""
 def estimatefiles(path='.'):
