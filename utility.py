@@ -20,7 +20,7 @@ def selfCorr(data):
     npsignalplot(pearsonCroCor(np.append(np.append(data,data),data),data))
 
 """ sliding window"""
-def slidingwindow(X = np.array([]), n = 1, p = 0):
+def slidingwindow(X = np.array([]), n = 1, p = 1):
     #buffers data vector X into length n column vectors with overlap p
     #excess data at the end of X is discarded
     n = int(n) #length of each data vector
@@ -48,10 +48,9 @@ def reshape_add(X = np.array([]),p=0):
 
 """find all correlation peaks"""
 def findpeaks(corrdata,sample_length):
-    peak_positions=np.zeros(int(corrdata.size/sample_length))
+    peak_positions=[]
     npsignalplot(corrdata)
     i=0
-    peak_count=0
     """note: divide by 2 is corresponding to the length of gsm and zeros added
     """
     while i+sample_length/2<=corrdata.size:
@@ -59,10 +58,9 @@ def findpeaks(corrdata,sample_length):
             i=int(i)+np.argmax(np.abs(corrdata[int(i):]))
         else:
             i=int(i)+np.argmax(np.abs(corrdata[int(i):int(i+sample_length)]))
-        peak_positions[peak_count]=int(i)
+        peak_positions.append(int(i))
         i+=sample_length/2
-        peak_count+=1
-    return peak_positions
+    return np.asarray(peak_positions)
 
 """find the peak"""
 def findpeak(data):
