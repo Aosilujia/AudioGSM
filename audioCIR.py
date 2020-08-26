@@ -77,9 +77,6 @@ Barker = [-1, -1, -1, -1, -1, 1, 1, -1, -1, 1, -1, 1, -1]
 
 Barker_11 = [1, 1, 1, 0, 0, 0, 1, 0, 0, 1, 0]
 
-"""program parames"""
-DEBUG_MODE = 0
-
 
 def hammingwindow(data):
     length_window = 1000 #np.size(data)
@@ -199,7 +196,7 @@ def generate():
 
 def denoise_HPF(data):
     """"""
-    filtrate = 2 * (frequency_lowerbound - 1000) / sampling_rate
+    filtrate = 2 * (frequency_lowerbound) / sampling_rate
     b, a = signal.butter(8, filtrate, 'highpass')
     filteredData = signal.filtfilt(b, a, data)
     return filteredData
@@ -209,7 +206,7 @@ def denoise_HPF(data):
 
 
 def filter2pass(data):
-    b, a = signal.butter(8, 2 * (2000) / sampling_rate, 'lowpass')
+    b, a = signal.butter(8, 2 * (channel_bandwidth/2) / sampling_rate, 'lowpass')
     filteredData = signal.filtfilt(b, a, data)
     return filteredData
 
@@ -274,7 +271,7 @@ def framedetection(data, framelength):
     if (data.size < detect_length):
         detect_length = data.size
     corr = pearsonCroCor(real_data[0:detect_length], original_array)
-    npsignalplot(corr)
+    # npsignalplot(corr)
 
     return pickframe(corr, framelength)
 
@@ -408,8 +405,12 @@ def CIR_LS_SIMPLE(data):
 
 """use expanded GTS to generate longer CIR"""
 
-
 def CIR_LS_Expanding(data, expanding_length):
+    M_translation = CIR_Matrix_Expanding(L, P, expanding_length)
+    result_CIR = M_translation * ((np.matrix(data[L * expanding_length:(L + P) * expanding_length])).T)
+    return result_CIR.flatten()[0].tolist()
+
+def CIR_LS_Expanding_approximation(data, expanding_length):
     M_translation = CIR_Matrix_Expanding_approximation(L, P, expanding_length)
     result_CIR = M_translation * ((np.matrix(data[L * expanding_length:(L + P) * expanding_length])).T)
     return result_CIR.flatten()[0].tolist()
@@ -420,12 +421,25 @@ def CIR_LS_Expanding(data, expanding_length):
 
 def CIR_CC_Expanding(data, expanding_length):
     sample_send = CIR_Sample_CC(L, P, expanding_length)
-    result_CIR = np.correlate(data[:(L + P) * expanding_length], sample_send, 'same')
-    return result_CIR.tolist()
+    result_CIR=[]
+    """for (i in range(L*expanding_length+1)):
+        result_CIR.append(np.flip(data[i:]))
+    """
+    result_CIR = np.correlate(np.flip(data[:(L + P) * expanding_length]), sample_send, 'same')
+    return [result_CIR.tolist()]
+
+
+"""estimation way selector"""
+def CIR_EXTRACT(data,expanding_length,mode="LSAPP"):
+    if mode=="LSAPP":
+        return CIR_LS_Expanding_approximation(data,expanding_length)
+    elif mode=="LS":
+        return CIR_LS_Expanding(data,expanding_length)
+    elif mode=="CC":
+        return CIR_CC_Expanding(data,expanding_length)
 
 
 """extract sequence from frame"""
-
 
 def received_sequence(data):
     resultsequence = []
@@ -440,7 +454,6 @@ def received_sequence(data):
 
 
 """main function to estimate received signal"""
-
 
 def estimate(filename):
     """read the wave file raw data
@@ -509,7 +522,7 @@ def estimate(filename):
             if int(peak)+effective_length<frame_datas.size:
                 framesequence = frame_datas[int(peak):int(peak) + effective_length]
             """CIR estimation for each frame"""
-            cir = CIR_LS_Expanding(framesequence, expanding_length)
+            cir = CIR_EXTRACT(framesequence, expanding_length)
             csv_writer.writerows(cir)
 
     elif PRECISE_FRAME_DETECTION_MODE == 0:
@@ -517,7 +530,7 @@ def estimate(filename):
         while i + frame_length <= np.size(frame_datas):
             framesequence = frame_datas[int(i):int(i) + effective_length]
             """CIR estimation for each frame"""
-            cir = CIR_LS_Expanding(framesequence, expanding_length)
+            cir = CIR_EXTRACT(framesequence, expanding_length)
 
             csv_writer.writerows(cir)
             """relocate frame process"""
@@ -532,7 +545,7 @@ def estimate(filename):
                 framecount=0
             """
             i += practical_frame_length  # choose practical frame length to avoid mistakes
-
+    f.close()
 
 """estimate files from a filepath or file, altered from pcm2wav"""
 
