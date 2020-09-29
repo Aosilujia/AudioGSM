@@ -1,4 +1,6 @@
 import numpy as np
+import os
+import csv
 import matplotlib.pyplot as plt
 from scipy.stats.stats import pearsonr
 
@@ -49,7 +51,7 @@ def reshape_add(X = np.array([]),p=0):
 """find all correlation peaks"""
 def findpeaks(corrdata,sample_length):
     peak_positions=[]
-    npsignalplot(corrdata)
+    #npsignalplot(corrdata)
     i=0
     """note: divide by 2 is corresponding to the length of gsm and zeros added
     """
@@ -79,6 +81,66 @@ def pickframe(corrdata,frame_length):
     first_peak=peak_position-int(int(peak_position/frame_length)*frame_length)
     return first_peak
 
+
+"""write multiple cir data to disk, input should be a list of cir data"""
+def writeCIRs2csv(cirs,tag="",output_path="./tmpCIR"):
+    """check directory"""
+    if not os.path.isdir(output_path):
+        os.makedirs(output_path)
+
+    """check any filename that matches the tag, to generate an id"""
+    data_count=0
+    for root, dirs, files in os.walk(output_path):
+        """walk for all the filenames"""
+        for filename in files:
+            """check if the filename contains the tag"""
+            if (len(filename)>len(tag)):
+                if (filename[:len(tag)]==tag):
+                    """"check the next character after the tag to make sure this is not another tag with the same former part"""
+                    if (filename[len(tag):len(tag)+1]=="_"):
+                        data_count+=1
+
+    """base file path to add numbers"""
+    base_path=output_path+"/"+tag+"_"
+
+    """write every cir to disk, increment id every time"""
+    for cir in cirs:
+        file_path=base_path+str(data_count)+'.csv'
+        data_count+=1
+        CIR2csv(cir,file_path)
+
+
+"""write cir data to disk, would check the tag name for a unique filename"""
+def writeCIR2csv(cir,tag="",output_path="./tmpCIR"):
+    """check directory"""
+    if not os.path.isdir(output_path):
+        os.makedirs(output_path)
+
+    """check any filename that matches the tag, to generate an id"""
+    data_count=0
+    for root, dirs, files in os.walk(output_path):
+        """walk for all the filenames"""
+        for filename in files:
+            """check if the filename contains the tag"""
+            if (len(filename)>len(tag)):
+                if (filename[:len(tag)]==tag):
+                    """"check the next character after the tag to make sure this is not another tag with the same former part"""
+                    if (filename[len(tag):len(tag)+1]=="_"):
+                        data_count+=1
+
+    """generate the full file path"""
+    base_path=output_path+"/"+tag+"_"
+    file_path=base_path+str(data_count)+'.csv'
+
+    """write to disk"""
+    CIR2csv(cir,file_path)
+
+"""SHALL NOT BE IMPORTED write one cir data to csv, by precise file name and directory,without checking,"""
+def CIR2csv(cir,file_path=""):
+    f = open(file_path, 'w', encoding='utf-8', newline='')
+    csv_writer = csv.writer(f)
+    csv_writer.writerows(cir)
+    f.close()
 
 #fast signal pyplot with np array
 def npsignalplot(data):
