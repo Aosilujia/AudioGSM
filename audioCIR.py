@@ -271,7 +271,7 @@ def framedetection(data, framelength):
     if (data.size < detect_length):
         detect_length = data.size
     corr = pearsonCroCor(real_data[0:detect_length], original_array)
-    # npsignalplot(corr)
+    #npsignalplot(corr)
 
     return pickframe(corr, framelength)
 
@@ -617,14 +617,15 @@ if __name__ == '__main__':
             if (sequence_data[i] == 0):
                 sequence_data[i] = -1
         print(sequence_data)
+        selfCorr(np.asarray(sequence_data))
         matrix = CIR_Matrix(5, 8, sequence_data)
         # matrix=(1/(P*12))*np.matrix(Circulant_TSM(L,P,12)).H
-        matrix = CIR_Matrix_Expanding_approximation(L, P, 12)
-        matrix2 = np.zeros(matrix.shape[0])
-        for i in range(matrix.shape[0]):
-            matrix2[i] = np.sum(matrix[i])
-        print(sum(matrix2))
-        npsignalplot(matrix2)
+        #matrix = CIR_Matrix_Expanding_approximation(L, P, 12)
+        #matrix2 = np.zeros(matrix.shape[0])
+        #for i in range(matrix.shape[0]):
+        #    matrix2[i] = np.sum(matrix[i])
+        #print(sum(matrix2))
+        #npsignalplot(matrix2)
 
         # generate()
         # estimate("1_honor.wav")

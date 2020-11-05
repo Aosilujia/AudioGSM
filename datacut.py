@@ -24,7 +24,10 @@ def cir_cut_dir(path='.',tag="",output_path="./training_data"):
                 print(nextpath)
                 print(full_output_path)
                 partition_word_bypeak(nextpath,tag_content=content_tag,output_path=full_output_path,
-                                static_threshold=0.02,data_length=200,show_charts=False,writecsv=True,
+                                static_threshold=0.02,data_length=200,show_charts=True,writecsv=False,
                                 desired_peaks=3)
 
-cir_cut_dir("expdata/jxy")
+def cir_cut_selected_files(filelist='./datalist.txt',tag="",output_path="./training_data")
+
+
+cir_cut_dir("expdata/jxy/O")
