@@ -84,6 +84,10 @@ def partition_word_bypeak(cir_file,tag_content="", output_path="./training_data"
     """平滑数据曲线"""
     Mguassian=gaussian_filter1d(dcir_sum * dcir_sum, 4)
 
+    """根据标签长度延长数据段长度"""
+    if (len(tag_content)>=3):
+        data_length+=50*(len(tag_content)-2)
+
     """根据data length的参数，默认从peak向左向右各取一半长度"""
     righten_length=int(data_length/2)
     leften_length=int(data_length/2)
@@ -116,10 +120,17 @@ def partition_word_bypeak(cir_file,tag_content="", output_path="./training_data"
     """取相应数量的数据中心点"""
     base_positions=get_desired_peaks(Mguassian,static_threshold,desired_peaks,righten_length,leften_length)
 
+    if show_charts:
+        plt.subplot(2,1,1)
+        plt.pcolormesh((np.abs(cir_data)).T)
+
     """根据得到的左右长度和中心点，取每一个pos对应的区间"""
     for (index,position) in enumerate(base_positions):
         """调整标签以适应CTC，主要是加上字与字之间的转进"""
         print([position-leften_length,position+righten_length])
+        if show_charts:
+            plt.axvline(x=position-leften_length,ls="-",c="red")
+            plt.axvline(x=position+righten_length,ls="-",c="red")
         tag_withinfo=tag_content
         if (index==0):
             tag_withinfo=tag_content
@@ -128,9 +139,9 @@ def partition_word_bypeak(cir_file,tag_content="", output_path="./training_data"
         if writecsv:
             writeCIR2csv(cir_data[position-leften_length:position+righten_length],tag_withinfo,output_path)
 
+
+
     if show_charts:
-        plt.subplot(2,1,1)
-        plt.pcolormesh((np.abs(cir_data)).T)
         plt.subplot(2,1,2)
         plt.plot(Mguassian)
         plt.show()
@@ -223,7 +234,7 @@ def get_desired_peaks(Mguassian,static_threshold,desired_peaks,righten_length,le
     return base_positions
 
 """手动选取中心坐标，切割cir"""
-def partition_cir_manually(cir_file,tag_content="", output_path="./training_data",writecsv=False,data_length=200,lengthen_rule={},static_threshold=0.02):
+def partition_cir_manually(cir_file,tag_content="", output_path="./training_data",writecsv=False,data_length=200,lengthen_rule={}):
     """读数据"""
     cir_data = np.genfromtxt(cir_file, dtype=complex, delimiter=',')
     """作差"""
@@ -233,18 +244,32 @@ def partition_cir_manually(cir_file,tag_content="", output_path="./training_data
     """平滑数据曲线"""
     Mguassian=gaussian_filter1d(dcir_sum * dcir_sum, 4)
 
+    plt.figure()
     plt.subplot(2,1,1)
-    plt.pcolormesh((np.abs(cir_data)).T)
-    plt.subplot(2,1,2)
     plt.plot(Mguassian)
-    plt.show()
+    plt.subplot(2,1,2)
+    plt.pcolormesh((np.abs(cir_data)).T)
+    try:
+        pos = plt.ginput(n=-1)
+    except:
+        print("用中键退出,不要点叉")
+        return
+    """
     input_string=input("输入中心点数字（1个或多个）")
     strings=input_string.split( )
+    """
+
+    """根据标签长度延长数据段长度"""
+    if (len(tag_content)>=3):
+        data_length+=50*(len(tag_content)-2)
+
     leften_length=int(data_length/2)
     righten_length=data_length-leften_length
-    for (index,s) in enumerate(strings):
-        position = int(s)
+    datacount=0
+    for (index,s) in enumerate(pos):
+        position = int(s[0])
         print([position-leften_length,position+righten_length])
+        datacount+=1
         tag_withinfo=tag_content
         if (index==0):
             tag_withinfo=tag_content
@@ -252,7 +277,7 @@ def partition_cir_manually(cir_file,tag_content="", output_path="./training_data
             tag_withinfo="="+tag_content
         if writecsv:
             writeCIR2csv(cir_data[position-leften_length:position+righten_length],tag_withinfo,output_path)
-
+    return datacount
 
 
 """do segmentation to extract the moving part"""
@@ -372,7 +397,7 @@ def drawDCIR(filename):
 
 if __name__ == '__main__':
     #for i in range(3,4):
-    filename = 'expdata/jxy/N/5.csv'
+    filename = 'testdata/8.csv'
     #filename = 'training_data/A/jxy/=A_0.csv'
     cir_data = np.genfromtxt(filename, dtype=complex, delimiter=',')
     #short_cir_data=(np.sum(np.abs(cir_data).reshape(-1,11),axis=1)).reshape(-1,11)

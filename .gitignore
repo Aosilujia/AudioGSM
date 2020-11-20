@@ -6,6 +6,7 @@ __pycache__
 *.pk
 *.txt
 *.zip
+*.png
 2020*
 gsmtest
 test*
