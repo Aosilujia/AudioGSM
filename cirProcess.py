@@ -253,7 +253,8 @@ def partition_cir_manually(cir_file,tag_content="", output_path="./training_data
         pos = plt.ginput(n=-1)
     except:
         print("用中键退出,不要点叉")
-        return
+        return 0
+    plt.close()
     """
     input_string=input("输入中心点数字（1个或多个）")
     strings=input_string.split( )

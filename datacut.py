@@ -2,6 +2,8 @@ import os,shutil
 import queue
 from cirProcess import partition_cir,partition_word_bypeak,partition_cir_manually
 
+MODE_VERIFY=True
+
 def cir_cut_dir(path='.',output_path="./training_data"):
     """"""
     if not os.path.isdir(path):
@@ -24,7 +26,7 @@ def cir_cut_dir(path='.',output_path="./training_data"):
                 print(nextpath)
                 print(full_output_path)
                 partition_word_bypeak(nextpath,tag_content=content_tag,output_path=full_output_path,
-                                static_threshold=0.08,data_length=200,show_charts=True,writecsv= False,
+                                static_threshold=0.08,data_length=200,show_charts=MODE_VERIFY,writecsv=(not MODE_VERIFY),
                                 desired_peaks=3)
 
 def cir_cut_selected_files(filelist='./datalist.txt',output_path="./training_data"):
@@ -82,5 +84,6 @@ def mymovefile(srcfile,dstfile):
         shutil.move(srcfile,dstfile)          #移动文件
         print("move %s -> %s"%( srcfile,dstfile))
 
-cir_cut_dir("expdata/jxyword/jxy/a")
-#cir_cut_selected_files()
+MODE_VERIFY=False
+#cir_cut_dir("expdata/jxyword/jxy/like")
+cir_cut_selected_files()
