@@ -25,9 +25,11 @@ def cir_cut_dir(path='.',output_path="./training_data"):
                 full_output_path=output_path+"/"+content_tag+"/"+user_tag
                 print(nextpath)
                 print(full_output_path)
-                partition_word_bypeak(nextpath,tag_content=content_tag,output_path=full_output_path,
-                                static_threshold=0.08,data_length=200,show_charts=MODE_VERIFY,writecsv=(not MODE_VERIFY),
-                                desired_peaks=3)
+                result=partition_word_bypeak(nextpath,tag_content=content_tag,output_path=full_output_path,
+                                static_threshold=0.02,data_length=200,show_charts=MODE_VERIFY,writecsv=(not MODE_VERIFY),
+                                desired_peaks=4)
+                if (not MODE_VERIFY) and result!=0:
+                    mymovefile(nextpath,"./processed_data/"+nextpath)
 
 def cir_cut_selected_files(filelist='./datalist.txt',output_path="./training_data"):
     if not os.path.exists(filelist):
@@ -84,6 +86,6 @@ def mymovefile(srcfile,dstfile):
         shutil.move(srcfile,dstfile)          #移动文件
         print("move %s -> %s"%( srcfile,dstfile))
 
-MODE_VERIFY=False
-#cir_cut_dir("expdata/jxyword/jxy/like")
-cir_cut_selected_files()
+#MODE_VERIFY=False
+cir_cut_dir("expdata/jxyword/jxy/")
+#cir_cut_selected_files()

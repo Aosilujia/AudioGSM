@@ -82,7 +82,7 @@ def partition_word_bypeak(cir_file,tag_content="", output_path="./training_data"
     """对作差的数据求和"""
     dcir_sum = np.sum(cir_diff, axis=1)
     """平滑数据曲线"""
-    Mguassian=gaussian_filter1d(dcir_sum * dcir_sum, 4)
+    Mguassian=gaussian_filter1d(dcir_sum * dcir_sum, 6)
 
     """根据标签长度延长数据段长度"""
     if (len(tag_content)>=3):
@@ -151,12 +151,14 @@ def partition_word_bypeak(cir_file,tag_content="", output_path="./training_data"
 """已有高斯平滑后的数据，基于输入的阈值进行微调，目标是得到符合（或少于）desired_peaks数量的数据段"""
 def get_desired_peaks(Mguassian,static_threshold,desired_peaks,righten_length,leften_length,AUTO_TUNING=True):
     threshold=static_threshold
-    threshold_upperbound=threshold*2
-    threshold_lowerbound=threshold*0.5
+    threshold_upperbound=threshold*4
+    threshold_lowerbound=threshold*0.25
     tuning_gap=threshold/20
     base_positions=[]
     positions_tmp=[]
     tuning_flag=0 #状态码，0表示初始，1表示在上界到中间，-1表示下界到中间
+    last_count=0
+    auto_TUNING=AUTO_TUNING
     while True:
         positions_tmp=base_positions
         base_positions=[]
@@ -199,12 +201,19 @@ def get_desired_peaks(Mguassian,static_threshold,desired_peaks,righten_length,le
             if peaks[0][nearby_peaks_pos[0]]+righten_length<=Mguassian.size:
                 base_positions.append(peaks[0][nearby_peaks_pos[0]])
 
-        if not AUTO_TUNING:
+        if not auto_TUNING:
             break;
+
+        """记录上一次循环检测到的数量：初始化"""
+        if last_count==0:
+            last_count=len(base_positions)
+
         """判断分割的数量和desired_peaks差距"""
         if (len(base_positions)==desired_peaks):
+            """数量相符"""
             break
         if (tuning_flag==0):
+            """第一次调整时flag为0，判断检测数量和希望数量之间的差距，选择往上或者往下调阈值"""
             if (len(base_positions)<desired_peaks):
                 tuning_flag=-1
                 threshold-=tuning_gap
@@ -212,6 +221,11 @@ def get_desired_peaks(Mguassian,static_threshold,desired_peaks,righten_length,le
                 tuning_flag=1
                 threshold+=tuning_gap
         elif (tuning_flag==-1):
+            if (len(base_positions)<last_count):
+                """往下调阈值检测数量反而更少，不符合常理，判断为自动分割到达极限，回退到上一次结果"""
+                threshold+=tuning_gap
+                auto_TUNING=False
+                continue
             if (len(base_positions)<desired_peaks and threshold<=threshold_lowerbound):
                 """阈值调到最小也检不出满足的数量"""
                 break
@@ -221,6 +235,11 @@ def get_desired_peaks(Mguassian,static_threshold,desired_peaks,righten_length,le
             else:
                 threshold-=tuning_gap
         elif(tuning_flag==1):
+            if (len(base_positions)<last_count):
+                """往上调阈值检测数量反而更多，不符合常理，判断为自动分割到达极限，回退到上一次结果"""
+                threshold-=tuning_gap
+                auto_TUNING=False
+                continue
             if (len(base_positions)>desired_peaks and threshold>=threshold_upperbound):
                 """阈值调到最大也检不出满足的数量"""
                 break
@@ -231,6 +250,8 @@ def get_desired_peaks(Mguassian,static_threshold,desired_peaks,righten_length,le
                 threshold+=tuning_gap
         else:
             break
+        """记录上一次循环检测到的数量"""
+        last_count=len(base_positions)
     return base_positions
 
 """手动选取中心坐标，切割cir"""
@@ -398,8 +419,8 @@ def drawDCIR(filename):
 
 if __name__ == '__main__':
     #for i in range(3,4):
-    filename = 'testdata/8.csv'
-    #filename = 'training_data/A/jxy/=A_0.csv'
+    filename = 'training_data/Word\\and\jxy\=and_1.csv'
+    filename = 'training_data/7.csv'
     cir_data = np.genfromtxt(filename, dtype=complex, delimiter=',')
     #short_cir_data=(np.sum(np.abs(cir_data).reshape(-1,11),axis=1)).reshape(-1,11)
 
@@ -408,20 +429,20 @@ if __name__ == '__main__':
     static_cir_avg=np.average(static_cir_data,axis=0)
     cir_removestatic=cir_data-static_cir_avg
 
-    #drawCIR(filename)
+    drawCIR(filename)
     #作差
-    cir_diff = np.abs(np.diff(np.abs(cir_removestatic), axis=0))
+    cir_diff = np.abs(np.diff(np.abs(cir_data), axis=0))
 
     #short_cir_diff=np.abs(np.diff(short_cir_data, axis=0))
 
     # im = plt.imshow((b).T, interpolation='bilinear', cmap=cm.bwr )
     #dplt.pcolormesh((np.abs(cir_data)).T)
-    #plt.pcolormesh((np.abs(cir_diff)).T)
+    plt.pcolormesh((np.abs(cir_diff)).T)
     #plt.pcolormesh((np.abs(cir_removestatic)).T)
 
     #plt.savefig('{0}n'.format(i))
-    #plt.show()
+    plt.show()
     #partition_word_bypeak(filename,"N",static_threshold=0.02,show_charts=True,desired_peaks=3,writecsv=True)
-    partition_cir_manually(filename)
+    #partition_cir_manually(filename)
     #partition_cir(filename,"A",data_length=2000,show_charts=True,effective_threshold=0.005)
     #partition_word_bypeak(filename,"A",static_threshold=0.02,show_charts=True,desired_peaks=3,writecsv=True)
