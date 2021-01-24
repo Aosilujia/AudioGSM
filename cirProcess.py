@@ -431,31 +431,20 @@ def drawDCIR(filename):
 
 if __name__ == '__main__':
     for i in range(0,21):
-        filename = '..\GSM_generation\\training_data\\Word/require/jxy/require_{}.csv'.format(i)
+        #filename = '..\GSM_generation\\training_data\\Word/require/jxy/require_{}.csv'.format(i)
         filename = 'expdata/zqword/1/100.csv'
-        #filename = 'testdata/pixel3/1.csv'
-        cir_data = np.genfromtxt(filename, dtype=complex, delimiter=',')
-        #short_cir_data=(np.sum(np.abs(cir_data).reshape(-1,11),axis=1)).reshape(-1,11)
-
-        static_filename='expdata/dr/{19}.csv'
-        static_cir_data = np.genfromtxt(filename, dtype=complex, delimiter=',')
-        static_cir_avg=np.average(static_cir_data,axis=0)
-        cir_removestatic=cir_data-static_cir_avg
-
-        drawCIR(filename)
+        tag="the"
+        partition_cir_manually(filename,tag_content=tag, output_path="./training_data/",writecsv=True,data_length=200)
+        #cir_data = np.genfromtxt(filename, dtype=complex, delimiter=',')
+        #drawCIR(filename)
         #作差
-        cir_diff = np.abs(np.diff(np.abs(cir_data), axis=0))
-
-        #short_cir_diff=np.abs(np.diff(short_cir_data, axis=0))
-
+        #cir_diff = np.abs(np.diff(np.abs(cir_data), axis=0))
         # im = plt.imshow((b).T, interpolation='bilinear', cmap=cm.bwr )
-        #dplt.pcolormesh((np.abs(cir_data)).T)
-        plt.pcolormesh((np.abs(cir_diff)).T)
-        #plt.pcolormesh((np.abs(cir_removestatic)).T)
+        #plt.pcolormesh((np.abs(cir_diff)).T)
 
         #plt.savefig('{0}n'.format(i))
-        plt.show()
+        #plt.show()
         #partition_word_bypeak(filename,"N",static_threshold=0.02,show_charts=True,desired_peaks=3,writecsv=True)
-        partition_cir_manually(filename)
+        #partition_cir_manually(filename)
         #partition_cir(filename,"A",data_length=2000,show_charts=True,effective_threshold=0.005)
         #partition_word_bypeak(filename,"A",static_threshold=0.02,show_charts=True,desired_peaks=3,writecsv=True)
