@@ -19,7 +19,17 @@ def pearsonCroCor(data,sample):
 
 """test the self-correlation properties of one data """
 def selfCorr(data):
-    npsignalplot(pearsonCroCor(np.append(np.append(data,data),data),data))
+    return pearsonCroCor(np.append(data,data),data)
+
+def figureSelfCorr(data,label='Sequence name'):
+    fig, ax = plt.subplots()  # Create a figure and an axes.
+    corrresult=selfCorr(data)
+    x = np.linspace(0, corrresult.size, corrresult.size)
+    ax.plot(x, corrresult, label=label,color='orange')  # Plot some data on the axes.
+    ax.set_xlabel('Sequence Index')  # Add an x-label to the axes.
+    ax.set_ylabel('PCC')  # Add a y-label to the axes.
+    ax.legend()  # Add a legend.
+    plt.show()
 
 """ sliding window"""
 def slidingwindow(X = np.array([]), n = 1, p = 1):
@@ -111,7 +121,7 @@ def writeCIRs2csv(cirs,tag="",output_path="./tmpCIR"):
 
 
 """write cir data to disk, would check the tag name for a unique filename"""
-def writeCIR2csv(cir,tag="",output_path="./tmpCIR"):
+def writeCIR2csv(cir,tag="",output_path="./tmpCIR",distance=""):
     """check directory"""
     if not os.path.isdir(output_path):
         os.makedirs(output_path)
@@ -130,7 +140,10 @@ def writeCIR2csv(cir,tag="",output_path="./tmpCIR"):
 
     """generate the full file path"""
     base_path=output_path+"/"+tag+"_"
-    file_path=base_path+str(data_count)+'.csv'
+    data_name=base_path+str(data_count)
+    if (distance!=""):
+        data_name+='_'+distance
+    file_path=data_name+'.csv'
 
     """write to disk"""
     CIR2csv(cir,file_path)

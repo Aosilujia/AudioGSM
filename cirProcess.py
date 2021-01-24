@@ -124,22 +124,23 @@ def partition_word_bypeak(cir_file,tag_content="", output_path="./training_data"
         plt.subplot(2,1,1)
         plt.pcolormesh((np.abs(cir_data)).T)
 
+    dis=1
     """根据得到的左右长度和中心点，取每一个pos对应的区间"""
     for (index,position) in enumerate(base_positions):
-        """调整标签以适应CTC，主要是加上字与字之间的转进"""
+        """"""
         print([position-leften_length,position+righten_length])
         if show_charts:
             plt.axvline(x=position-leften_length,ls="-",c="red")
             plt.axvline(x=position+righten_length,ls="-",c="red")
         tag_withinfo=tag_content
+        """调整标签以适应CTC，主要是加上字与字之间的转进"""
         if (index==0):
             tag_withinfo=tag_content
         else:
             tag_withinfo="="+tag_content
         if writecsv:
-            writeCIR2csv(cir_data[position-leften_length:position+righten_length],tag_withinfo,output_path)
-
-
+            writeCIR2csv(cir_data[position-leften_length:position+righten_length],tag_withinfo,output_path,distance="{}".format(dis))
+        dis+=1
 
     if show_charts:
         plt.subplot(2,1,2)
@@ -257,13 +258,19 @@ def get_desired_peaks(Mguassian,static_threshold,desired_peaks,righten_length,le
 """手动选取中心坐标，切割cir"""
 def partition_cir_manually(cir_file,tag_content="", output_path="./training_data",writecsv=False,data_length=200,lengthen_rule={}):
     """读数据"""
-    cir_data = np.genfromtxt(cir_file, dtype=complex, delimiter=',')
+    cir_data = np.genfromtxt(cir_file, dtype=complex, delimiter=',')[:1600]
     """作差"""
-    cir_diff = np.abs(np.diff(cir_data, axis=0))
+    cir_diff = np.abs(np.diff(cir_data.real, axis=0))
     """对作差的数据求和"""
     dcir_sum = np.sum(cir_diff, axis=1)
     """平滑数据曲线"""
-    Mguassian=gaussian_filter1d(dcir_sum * dcir_sum, 4)
+    Mguassian=gaussian_filter1d(dcir_sum **2, 8)
+
+    dvalues=[]
+    split_data=slidingwindow(Mguassian,10)
+    for index,datum in enumerate(split_data):
+        dvalue=datum.std()
+        dvalues.append(dvalue)
 
     plt.figure()
     plt.subplot(2,1,1)
@@ -288,9 +295,13 @@ def partition_cir_manually(cir_file,tag_content="", output_path="./training_data
     leften_length=int(data_length/2)
     righten_length=data_length-leften_length
     datacount=0
+    dis=0
     for (index,s) in enumerate(pos):
         position = int(s[0])
-        print([position-leften_length,position+righten_length])
+        start_pos=position-leften_length
+        if (start_pos<=0):
+            start_pos=0
+        print([start_pos,position+righten_length])
         datacount+=1
         tag_withinfo=tag_content
         if (index==0):
@@ -298,7 +309,8 @@ def partition_cir_manually(cir_file,tag_content="", output_path="./training_data
         else:
             tag_withinfo="="+tag_content
         if writecsv:
-            writeCIR2csv(cir_data[position-leften_length:position+righten_length],tag_withinfo,output_path)
+            writeCIR2csv(cir_data[start_pos:position+righten_length],tag_withinfo,output_path,distance="{}".format(dis))
+        dis+=1
     return datacount
 
 
@@ -418,31 +430,32 @@ def drawDCIR(filename):
     plt.show()
 
 if __name__ == '__main__':
-    #for i in range(3,4):
-    filename = 'training_data/Word\\and\jxy\=and_1.csv'
-    filename = 'training_data/7.csv'
-    cir_data = np.genfromtxt(filename, dtype=complex, delimiter=',')
-    #short_cir_data=(np.sum(np.abs(cir_data).reshape(-1,11),axis=1)).reshape(-1,11)
+    for i in range(0,21):
+        filename = '..\GSM_generation\\training_data\\Word/require/jxy/require_{}.csv'.format(i)
+        filename = 'expdata/zqword/1/100.csv'
+        #filename = 'testdata/pixel3/1.csv'
+        cir_data = np.genfromtxt(filename, dtype=complex, delimiter=',')
+        #short_cir_data=(np.sum(np.abs(cir_data).reshape(-1,11),axis=1)).reshape(-1,11)
 
-    static_filename='expdata/dr/{19}.csv'
-    static_cir_data = np.genfromtxt(filename, dtype=complex, delimiter=',')
-    static_cir_avg=np.average(static_cir_data,axis=0)
-    cir_removestatic=cir_data-static_cir_avg
+        static_filename='expdata/dr/{19}.csv'
+        static_cir_data = np.genfromtxt(filename, dtype=complex, delimiter=',')
+        static_cir_avg=np.average(static_cir_data,axis=0)
+        cir_removestatic=cir_data-static_cir_avg
 
-    drawCIR(filename)
-    #作差
-    cir_diff = np.abs(np.diff(np.abs(cir_data), axis=0))
+        drawCIR(filename)
+        #作差
+        cir_diff = np.abs(np.diff(np.abs(cir_data), axis=0))
 
-    #short_cir_diff=np.abs(np.diff(short_cir_data, axis=0))
+        #short_cir_diff=np.abs(np.diff(short_cir_data, axis=0))
 
-    # im = plt.imshow((b).T, interpolation='bilinear', cmap=cm.bwr )
-    #dplt.pcolormesh((np.abs(cir_data)).T)
-    plt.pcolormesh((np.abs(cir_diff)).T)
-    #plt.pcolormesh((np.abs(cir_removestatic)).T)
+        # im = plt.imshow((b).T, interpolation='bilinear', cmap=cm.bwr )
+        #dplt.pcolormesh((np.abs(cir_data)).T)
+        plt.pcolormesh((np.abs(cir_diff)).T)
+        #plt.pcolormesh((np.abs(cir_removestatic)).T)
 
-    #plt.savefig('{0}n'.format(i))
-    plt.show()
-    #partition_word_bypeak(filename,"N",static_threshold=0.02,show_charts=True,desired_peaks=3,writecsv=True)
-    #partition_cir_manually(filename)
-    #partition_cir(filename,"A",data_length=2000,show_charts=True,effective_threshold=0.005)
-    #partition_word_bypeak(filename,"A",static_threshold=0.02,show_charts=True,desired_peaks=3,writecsv=True)
+        #plt.savefig('{0}n'.format(i))
+        plt.show()
+        #partition_word_bypeak(filename,"N",static_threshold=0.02,show_charts=True,desired_peaks=3,writecsv=True)
+        partition_cir_manually(filename)
+        #partition_cir(filename,"A",data_length=2000,show_charts=True,effective_threshold=0.005)
+        #partition_word_bypeak(filename,"A",static_threshold=0.02,show_charts=True,desired_peaks=3,writecsv=True)
